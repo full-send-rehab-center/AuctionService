@@ -19,12 +19,13 @@ public class AuctionController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IMongoDatabase _database;
     private readonly ILogger<AuctionController> _logger;
-    private readonly IMongoCollection<Auction> _auctionCollection;
+    //private readonly IMongoCollection<Auction> _auctionCollection;
     private readonly string? _docPath;
     private readonly string? _rabbitMQ;
-
+    public IMongoDatabase Database { get; set; }
+    public IMongoCollection<Auction> Collection { get; set; }
     private List<Auction> _auctions = new List<Auction>();
-    private List<BidDTO> _bids = new List<BidDTO>();
+   
 
 
     public AuctionController(ILogger<AuctionController> logger, IConfiguration config)
@@ -43,26 +44,50 @@ public class AuctionController : ControllerBase
         //Logs the enviroment variable
         _logger.LogInformation($"File path is set to : {_docPath}");
         _logger.LogInformation($"RabbitMQ connection is set to : {_rabbitMQ}");
+
+        var client = new MongoClient("mongodb+srv://mikkelbojstrup:aha64jmj@auktionshus.67fs0yo.mongodb.net/");
+        Database = client.GetDatabase("Auction");
+        Collection = Database.GetCollection<Auction>("Auction");
+
+/*
+        //Connects to the database
+            var client = new MongoClient(_config["MongoDB:ConnectionString"]);
+            var database = client.GetDatabase(_config["MongoDB:Database"]);
+            var auctionCollection = database.GetCollection<Auction>(_config["MongoDB:Collection"]);
+*/
+
     }
 
     [HttpGet(Name = "GetAuctions")]
     public List<Auction> GetAuctions()
     {
+        
+        var auctionDocument = Collection.Find(new BsonDocument()).ToList();
+        auctionDocument.ToJson();
         _logger.LogInformation("GetAuctions method called at {datetime}", DateTime.Now);
-        var auctionDocument = _auctionCollection.Find(new BsonDocument()).ToList();
 
-        return auctionDocument;
+        return auctionDocument.ToList();
+        
     }
 
+    [HttpPost(Name = "CreateAuction")]
+  public void CreateAuction( [FromBody]Auction auction)
+  {
+      _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
+
+      Collection.InsertOne(auction);
+  }
+
+/*
     [HttpGet("{id}", Name = "GetAuctionById")]
     public Auction GetAuctionById(string id)
     {
         _logger.LogInformation($"GetAuctionById method called at {DateTime.Now} with id: {id}");
-        var auctionDocument = _auctionCollection.Find<Auction>(auction => auction.AuctionId == id).FirstOrDefault();
+        var auctionDocument = _auctionCollection.Find<Auction>(auction => auction.Id == id).FirstOrDefault();
 
         return auctionDocument;
     }
-
+/*
     [HttpPost(Name = "PostAuction")]
     public IActionResult Post([FromBody] Auction auction)
     {
@@ -82,7 +107,7 @@ public class AuctionController : ControllerBase
             _auctionCollection.InsertOneAsync(auction);
 
             //Logs the auction
-            _logger.LogInformation($"Auction with id: {auction.AuctionId} and item: {auction.AuctionItem} was created at {DateTime.Now}");
+            _logger.LogInformation($"Auction with id: {auction.Id} and item: {auction.AuctionItem} was created at {DateTime.Now}");
 
             return Ok();
         }
@@ -150,7 +175,9 @@ public class AuctionController : ControllerBase
 
         }
         Console.WriteLine(" Press [enter] to exit.");
+        
     }
+    */
 }
 
 
