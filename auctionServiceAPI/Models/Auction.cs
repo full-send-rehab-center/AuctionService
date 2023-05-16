@@ -1,0 +1,33 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
+namespace auctionServiceAPI.DTO
+{
+    public class Auction
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; }
+
+        [BsonElement("auctionId")]
+        public string AuctionId { get; set; }
+
+        [BsonElement("auctionItem")]
+        public string? AuctionItem { get; set; }
+
+        [BsonElement("startingPrice")]
+        public decimal StartingPrice { get; set; }
+
+        [BsonElement("currentBid")]
+        public decimal CurrentBid { get; set; }
+
+        [BsonElement("startTime")]
+        public DateTime StartTime { get; set; }
+
+        [BsonElement("endTime")]
+        public DateTime EndTime { get; set; }
+
+        [BsonElement("bid")]
+        public BidDTO? Bid { get; set; }
+    }
+}

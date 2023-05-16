@@ -1,10 +1,30 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 
-public class bidDTO
+namespace auctionServiceAPI.DTO;
+
+public class BidDTO
 {
+    [BsonId]
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string Id { get; set; }
 
-    public decimal bidAmount { get; set; }
-    public int bidItemId { get; set; }
-    public int bidUserId { get; set; }
-    public DateTime bidDate { get; set; }
-    public string bidderUserName { get; set; }
+    public decimal BidAmount { get; set; }
+
+    public string Bidder { get; set; }
+    
+    public DateTime BidTime { get; set; }
+
+    public string AuctionId { get; set; }
+
+    public BidDTO(string id, decimal bidAmount, string bidder, DateTime bidTime, string auctionId)
+    {
+        Id = id;
+        BidAmount = bidAmount;
+        Bidder = bidder;
+        BidTime = bidTime;
+        AuctionId = auctionId;
+    }
+
+   
 }
