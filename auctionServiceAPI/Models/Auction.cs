@@ -7,7 +7,7 @@ namespace auctionServiceAPI.DTO
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [BsonElement("auctionItem")]
         public string? AuctionItem { get; set; }
@@ -23,10 +23,14 @@ namespace auctionServiceAPI.DTO
 
         [BsonElement("endTime")]
         public DateTime EndTime { get; set; }
-/*
-        [BsonElement("bid")]
+
+
+        [BsonElement("User")]
+        public UserDTO? User { get; set; }
+
+        [BsonElement("Bid")]
         public BidDTO? Bid { get; set; }
-        */
+
     }
 }
 

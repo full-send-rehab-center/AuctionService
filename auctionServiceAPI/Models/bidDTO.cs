@@ -11,17 +11,17 @@ public class BidDTO
 
     public decimal BidAmount { get; set; }
 
-    public string Bidder { get; set; }
+    public string BidderId { get; set; }
     
     public DateTime BidTime { get; set; }
 
     public string AuctionId { get; set; }
 
-    public BidDTO(string id, decimal bidAmount, string bidder, DateTime bidTime, string auctionId)
+    public BidDTO(string id, decimal bidAmount, string bidderId, DateTime bidTime, string auctionId)
     {
         Id = id;
         BidAmount = bidAmount;
-        Bidder = bidder;
+        BidderId = bidderId;
         BidTime = bidTime;
         AuctionId = auctionId;
     }

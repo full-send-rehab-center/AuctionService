@@ -19,13 +19,14 @@ public class AuctionController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IMongoDatabase _database;
     private readonly ILogger<AuctionController> _logger;
-    //private readonly IMongoCollection<Auction> _auctionCollection;
     private readonly string? _docPath;
     private readonly string? _rabbitMQ;
     public IMongoDatabase Database { get; set; }
     public IMongoCollection<Auction> Collection { get; set; }
+    public IMongoCollection<UserDTO> Collection2 { get; set; }
     private List<Auction> _auctions = new List<Auction>();
-   
+    private List<UserDTO> _users = new List<UserDTO>();
+
 
 
     public AuctionController(ILogger<AuctionController> logger, IConfiguration config)
@@ -45,90 +46,128 @@ public class AuctionController : ControllerBase
         _logger.LogInformation($"File path is set to : {_docPath}");
         _logger.LogInformation($"RabbitMQ connection is set to : {_rabbitMQ}");
 
-        var client = new MongoClient("mongodb+srv://mikkelbojstrup:aha64jmj@auktionshus.67fs0yo.mongodb.net/");
-        Database = client.GetDatabase("Auction");
-        Collection = Database.GetCollection<Auction>("Auction");
 
-/*
         //Connects to the database
-            var client = new MongoClient(_config["MongoDB:ConnectionString"]);
-            var database = client.GetDatabase(_config["MongoDB:Database"]);
-            var auctionCollection = database.GetCollection<Auction>(_config["MongoDB:Collection"]);
-*/
-
+        var client = new MongoClient(_config["MongoDB:ConnectionString"]);
+        _database = client.GetDatabase(_config["MongoDB:Database"]);
+        Collection = _database.GetCollection<Auction>(_config["MongoDB:Collection"]);
+        Collection2 = _database.GetCollection<UserDTO>(_config["MongoDB:Collection2"]);
     }
 
-    [HttpGet(Name = "GetAuctions")]
+    private IMongoCollection<UserDTO> GetUsersCollection(IConfiguration config)
+    {
+        var ConnectionString = config["MongoDB:ConnectionString"];
+        var database = config["MongoDB:Database"];
+        var usersCollection = config["MongoDB:Collection2"];
+
+        var client = new MongoClient(ConnectionString);
+        var db = client.GetDatabase(database);
+        var collection = db.GetCollection<UserDTO>(usersCollection);
+
+        return collection;
+    }
+
+    [HttpGet("auctions", Name = "GetAuctions")]
     public List<Auction> GetAuctions()
     {
-        
-        var auctionDocument = Collection.Find(new BsonDocument()).ToList();
-        auctionDocument.ToJson();
+        var auctionCollection = Collection.Find(new BsonDocument()).ToList();
+        auctionCollection.ToJson();
         _logger.LogInformation("GetAuctions method called at {datetime}", DateTime.Now);
 
-        return auctionDocument.ToList();
-        
+        return auctionCollection.ToList();
     }
 
-    [HttpPost(Name = "CreateAuction")]
-  public void CreateAuction( [FromBody]Auction auction)
-  {
-      _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
+    [HttpPost("auction", Name = "CreateAuction")]
+    public void CreateAuction([FromBody] Auction auction, [FromQuery] string id)
+    {
 
-      Collection.InsertOne(auction);
-  }
+        UserDTO user = Collection2.Find(x => x.Id == id).FirstOrDefault();
+        auction.Id = ObjectId.GenerateNewId().ToString();
+        auction.StartTime = DateTime.Now;
+        auction.EndTime = DateTime.Now.AddDays(2);
+        _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
+
+        //Adds the user to the auction
+        auction.User = user;
+
+        //Adds the auction to the user
+        Collection.InsertOne(auction);
+    }
+
+
+    [HttpGet("users", Name = "GetUsers")]
+    public List<UserDTO> GetUsers()
+    {
+        var usersCollection = GetUsersCollection(_config);
+        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+
+        _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
+
+        return userDocument.ToList();
+    }
+
+    [HttpGet("user/{id}", Name = "GetUserById")]
+    public UserDTO GetUserById(string id)
+    {
+        var usersCollection = GetUsersCollection(_config);
+        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+
+        _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
+
+        return userDocument.ToList().Find(x => x.Id == id);
+    }
+
+    [HttpPut("user/{id}", Name = "UpdateUser")]
+    public void UpdateUser(string id, [FromBody] UserDTO user)
+    {
+        var usersCollection = GetUsersCollection(_config);
+        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+
+        var userToUpdate = userDocument.ToList().Find(x => x.Id == id);
+
+        userToUpdate.Username = user.Username;
+        userToUpdate.Password = user.Password;
+        userToUpdate.Role = user.Role;
+        userToUpdate.Address = user.Address;
+        userToUpdate.Email = user.Email;
+        userToUpdate.Telephone = user.Telephone;
+
+        usersCollection.ReplaceOne(x => x.Id == id, userToUpdate);
+    }
+
+    [HttpDelete("user/{id}", Name = "DeleteUser")]
+    public void DeleteUser(string id)
+    {
+        var usersCollection = GetUsersCollection(_config);
+        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+
+        var userToDelete = userDocument.ToList().Find(x => x.Id == id);
+
+        usersCollection.DeleteOne(x => x.Id == id);
+    }
+
+
+
+    [HttpPost("user", Name = "CreateUser")]
+    public void CreateUser([FromBody] UserDTO user)
+    {
+        var usersCollection = GetUsersCollection(_config);
+        user.Id = ObjectId.GenerateNewId().ToString();
+        _logger.LogInformation($"**********User{user.Id} has been created:**********");
+        usersCollection.InsertOne(user);
+    }
+
+
 
 /*
-    [HttpGet("{id}", Name = "GetAuctionById")]
-    public Auction GetAuctionById(string id)
+    [HttpPost("bid", Name = "PostBid")]
+    public void PostBid(string id, decimal bidAmount, string bidderId, DateTime bidTime, string auctionId)
     {
-        _logger.LogInformation($"GetAuctionById method called at {DateTime.Now} with id: {id}");
-        var auctionDocument = _auctionCollection.Find<Auction>(auction => auction.Id == id).FirstOrDefault();
-
-        return auctionDocument;
-    }
-/*
-    [HttpPost(Name = "PostAuction")]
-    public IActionResult Post([FromBody] Auction auction)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        try
-        {
-            //Connects to the database
-            var client = new MongoClient(_config["MongoDB:ConnectionString"]);
-            var database = client.GetDatabase(_config["MongoDB:Database"]);
-
-            var auctionCollection = database.GetCollection<Auction>(_config["MongoDB:Collection"]);
-
-            _auctionCollection.InsertOneAsync(auction);
-
-            //Logs the auction
-            _logger.LogInformation($"Auction with id: {auction.Id} and item: {auction.AuctionItem} was created at {DateTime.Now}");
-
-            return Ok();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Something went wrong inside PostAuction action: {ex.Message}");
-            return StatusCode(500, "Internal server error");
-        }
-
-    }
-    //////////////////////lav put auction metode her////////////////////////
-
-
-    [HttpPost(Name = "PostBid")]
-    public void PostBid(string id, decimal bidAmount, string bidder, DateTime bidTime, string auctionId)
-    {
-        var bid = new BidDTO(id, bidAmount, bidder, bidTime, auctionId)
+        var bid = new BidDTO(id, bidAmount, bidderId, bidTime, auctionId)
         {
             Id = id,
             BidAmount = bidAmount,
-            Bidder = bidder,
+            BidderId = bidderId,
             BidTime = DateTime.Now,
             AuctionId = auctionId
 
@@ -150,7 +189,7 @@ public class AuctionController : ControllerBase
                                  arguments: null);
 
             //convert bid to JSON
-            var body = JsonSerializer.SerializeToUtf8Bytes(_bids);
+            var body = JsonSerializer.SerializeToUtf8Bytes(bid);
             _logger.LogInformation($"Bid serialized at {DateTime.Now}");
 
             //send bid to RabbitMQ queue
@@ -159,25 +198,159 @@ public class AuctionController : ControllerBase
                                  basicProperties: null,
                                  body: body);
             _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
-            Console.WriteLine(" [x] Sent {0}", _bids);
+            Console.WriteLine(" [x] Sent {0}", bid);
 
+            // save bid to cache
+            var cacheKey = $"bid_{auctionId}";
+            var cacheBid = GetBidFromCache(cacheKey);
 
-            //get previous bid from cache
+            // check if bid amount is greater than previous bid amount
+            if (cacheBid == null || bidAmount > cacheBid.BidAmount)
+            {
+                // create new bid or update existing bid
+                SetBidToCache(cacheKey, bid);
 
-            //check if bid amount is greater than previous bid amount
+                // send new bid to RabbitMQ queue
+                channel.BasicPublish(exchange: "", routingKey: "bidQueue", basicProperties: null, body: body);
+                _logger.LogInformation($"New bid sent to RabbitMQ queue at {DateTime.Now}");
+            }
+            else
+            {
+                // The bid amount is not greater than the previous bid, so no action is taken.
+                _logger.LogInformation($"Bid amount is not greater than the previous bid amount. No action taken.");
+            }
 
-            //create new bid
-
-
-            //save bid to cache
-
-            //send new bid to RabbitMQ queue
-
+            Console.WriteLine(" Press [enter] to exit.");
         }
-        Console.WriteLine(" Press [enter] to exit.");
-        
+
+
+
+
+
+
+
+
+        /*
+            [HttpGet(Name = "GetAuctions")]
+            public List<Auction> GetAuctions()
+            {
+
+                var auctionDocument = Collection.Find(new BsonDocument()).ToList();
+                auctionDocument.ToJson();
+                _logger.LogInformation("GetAuctions method called at {datetime}", DateTime.Now);
+
+                return auctionDocument.ToList();
+
+            }
+
+            [HttpPost(Name = "CreateAuction")]
+          public void CreateAuction( [FromBody]Auction auction)
+          {
+              _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
+
+              Collection.InsertOne(auction);
+          }
+        */
+        /*
+            [HttpGet("{id}", Name = "GetAuctionById")]
+            public Auction GetAuctionById(string id)
+            {
+                _logger.LogInformation($"GetAuctionById method called at {DateTime.Now} with id: {id}");
+                var auctionDocument = _auctionCollection.Find<Auction>(auction => auction.Id == id).FirstOrDefault();
+
+                return auctionDocument;
+            }
+        /*
+            [HttpPost(Name = "PostAuction")]
+            public IActionResult Post([FromBody] Auction auction)
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                try
+                {
+                    //Connects to the database
+                    var client = new MongoClient(_config["MongoDB:ConnectionString"]);
+                    var database = client.GetDatabase(_config["MongoDB:Database"]);
+
+                    var auctionCollection = database.GetCollection<Auction>(_config["MongoDB:Collection"]);
+
+                    _auctionCollection.InsertOneAsync(auction);
+
+                    //Logs the auction
+                    _logger.LogInformation($"Auction with id: {auction.Id} and item: {auction.AuctionItem} was created at {DateTime.Now}");
+
+                    return Ok();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Something went wrong inside PostAuction action: {ex.Message}");
+                    return StatusCode(500, "Internal server error");
+                }
+
+            }
+            //////////////////////lav put auction metode her////////////////////////
+
+
+            [HttpPost(Name = "PostBid")]
+            public void PostBid(string id, decimal bidAmount, string bidder, DateTime bidTime, string auctionId)
+            {
+                var bid = new BidDTO(id, bidAmount, bidder, bidTime, auctionId)
+                {
+                    Id = id,
+                    BidAmount = bidAmount,
+                    Bidder = bidder,
+                    BidTime = DateTime.Now,
+                    AuctionId = auctionId
+
+                };
+
+
+                //create connection to RabbitMQ server
+                var factory = new ConnectionFactory() { HostName = _rabbitMQ };
+                using var connection = factory.CreateConnection();
+                using var channel = connection.CreateModel();
+                _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
+
+                {
+                    //create queue if it doesn't exist
+                    channel.QueueDeclare(queue: "bidQueue",
+                                         durable: false,
+                                         exclusive: false,
+                                         autoDelete: false,
+                                         arguments: null);
+
+                    //convert bid to JSON
+                    var body = JsonSerializer.SerializeToUtf8Bytes(_bids);
+                    _logger.LogInformation($"Bid serialized at {DateTime.Now}");
+
+                    //send bid to RabbitMQ queue
+                    channel.BasicPublish(exchange: "",
+                                         routingKey: "bidQueue",
+                                         basicProperties: null,
+                                         body: body);
+                    _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
+                    Console.WriteLine(" [x] Sent {0}", _bids);
+
+
+                    //get previous bid from cache
+
+                    //check if bid amount is greater than previous bid amount
+
+                    //create new bid
+
+
+                    //save bid to cache
+
+                    //send new bid to RabbitMQ queue
+
+                }
+                Console.WriteLine(" Press [enter] to exit.");
+
+            }
+            */
     }
-    */
-}
 
 
