@@ -27,10 +27,10 @@ namespace auctionServiceAPI.DTO
 
         [BsonElement("User")]
         public UserDTO? User { get; set; }
-
+/*
         [BsonElement("Bid")]
         public BidDTO? Bid { get; set; }
-
+*/
     }
 }
 
