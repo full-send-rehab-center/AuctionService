@@ -24,8 +24,9 @@ public class AuctionController : ControllerBase
     private readonly string? _docPath;
     private readonly string? _rabbitMQ;
     public IMongoDatabase Database { get; set; }
-    public IMongoCollection<Auction> Collection { get; set; }
-    public IMongoCollection<UserDTO> Collection2 { get; set; }
+    public IMongoCollection<Auction> AuctionCollection { get; set; }
+    public IMongoCollection<UserDTO> UsersCollection { get; set; }
+    public IMongoCollection<BidDTO> BidCollection { get; set; }
     private List<Auction> _auctions = new List<Auction>();
     private List<UserDTO> _users = new List<UserDTO>();
 
@@ -52,15 +53,16 @@ public class AuctionController : ControllerBase
         //Connects to the database
         var client = new MongoClient(_config["MongoDB:ConnectionString"]);
         _database = client.GetDatabase(_config["MongoDB:Database"]);
-        Collection = _database.GetCollection<Auction>(_config["MongoDB:Collection"]);
-        Collection2 = _database.GetCollection<UserDTO>(_config["MongoDB:Collection2"]);
+        AuctionCollection = _database.GetCollection<Auction>(_config["MongoDB:AuctionCollection"]);
+        UsersCollection = _database.GetCollection<UserDTO>(_config["MongoDB:UsersCollection"]);
+        BidCollection = _database.GetCollection<BidDTO>(_config["MongoDB:BidCollection"]);
     }
 
     private IMongoCollection<UserDTO> GetUsersCollection(IConfiguration config)
     {
         var ConnectionString = config["MongoDB:ConnectionString"];
         var database = config["MongoDB:Database"];
-        var usersCollection = config["MongoDB:Collection2"];
+        var usersCollection = config["MongoDB:UsersCollection"];
 
         var client = new MongoClient(ConnectionString);
         var db = client.GetDatabase(database);
@@ -72,7 +74,7 @@ public class AuctionController : ControllerBase
     [HttpGet("auctions", Name = "GetAuctions")]
     public List<Auction> GetAuctions()
     {
-        var auctionCollection = Collection.Find(new BsonDocument()).ToList();
+        var auctionCollection = AuctionCollection.Find(new BsonDocument()).ToList();
         auctionCollection.ToJson();
         _logger.LogInformation("GetAuctions method called at {datetime}", DateTime.Now);
 
@@ -82,9 +84,7 @@ public class AuctionController : ControllerBase
     [HttpPost("auction", Name = "CreateAuction")]
     public void CreateAuction([FromBody] Auction auction, [FromQuery] string id)
     {
-
-        UserDTO user = Collection2.Find(x => x.Id == id).FirstOrDefault();
-        auction.Id = ObjectId.GenerateNewId().ToString();
+        UserDTO user = UsersCollection.Find(x => x.Id == id).FirstOrDefault();
         auction.StartTime = DateTime.Now;
         auction.EndTime = DateTime.Now.AddDays(2);
         _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
@@ -93,7 +93,7 @@ public class AuctionController : ControllerBase
         auction.User = user;
 
         //Adds the auction to the user
-        Collection.InsertOne(auction);
+        AuctionCollection.InsertOne(auction);
     }
 /*
     [HttpPut("auction/{id}", Name = "UpdateAuction")]
@@ -177,19 +177,25 @@ public class AuctionController : ControllerBase
 
 
     /////////////////////////////////////////////////////////BID METHODS//////////////////////////////////////////////////////////////////////////////////////
+    //Gets the user id from the user collection
+    private string GetUserId(string bidderId)
+    {
+        var user = UsersCollection.Find(x => x.Id == bidderId).FirstOrDefault();
+        return user.Id;
+    }
+
+    //Gets the auction id from the auction collection
+    private string GetAuctionId(string auctionId)
+    {
+        var auction = AuctionCollection.Find(x => x.Id == auctionId).FirstOrDefault();
+        return auction.Id;
+    }
 
     [HttpPost("Bid", Name = "SendBid")]
-    public void SendBid(string id, decimal bidAmount, string bidderId, DateTime bidTime, string auctionId)
+    public void SendBid([FromBody] BidDTO bid)
     {
-        var bid = new BidDTO(id, bidAmount, bidderId, bidTime, auctionId)
-        {
-            Id = id,
-            BidAmount = bidAmount,
-            BidderId = bidderId,
-            BidTime = DateTime.Now,
-            AuctionId = auctionId
 
-        };
+        BidCollection.InsertOne(bid);
 
         //create connection to RabbitMQ server
         var factory = new ConnectionFactory() { HostName = _rabbitMQ };
@@ -209,14 +215,25 @@ public class AuctionController : ControllerBase
             var body = JsonSerializer.SerializeToUtf8Bytes(bid);
             _logger.LogInformation($"Bid serialized at {DateTime.Now}");
 
-            //send bid to RabbitMQ queue
+            //publishes the JSON-string to the channel
             channel.BasicPublish(exchange: "",
                                  routingKey: "bidQueue",
                                  basicProperties: null,
                                  body: body);
             _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
             Console.WriteLine(" [x] Sent {0}", bid);
+
+        Console.WriteLine(" Press [enter] to exit.");
+
+        } 
+        
+    }
+}
+
 /*
+
+
+   
 
             // save bid to cache
             var cacheKey = $"bid_{auctionId}";
@@ -253,12 +270,7 @@ public class AuctionController : ControllerBase
 
                 }
                 */
-                Console.WriteLine(" Press [enter] to exit.");
 
-            }
-            
+                
         
-    }
-}
-
 
