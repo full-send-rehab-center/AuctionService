@@ -171,8 +171,8 @@ public class AuctionController : ControllerBase
     {
         var usersCollection = GetUsersCollection(_config);
         user.Id = ObjectId.GenerateNewId().ToString();
-        _logger.LogInformation($"**********User{user.Id} has been created:**********");
         usersCollection.InsertOne(user);
+        _logger.LogInformation($"**********User{user.Id} has been created:**********");
     }
 
 
@@ -198,6 +198,30 @@ public class AuctionController : ControllerBase
         BidCollection.InsertOne(bid);
 
         //create connection to RabbitMQ server
+        ConnectionFactory factory = new();
+        factory.Uri = new Uri(uriString: "amqp://guest:guest@localhost:5672");
+        factory.ClientProvidedName = "Bid Sender Method";
+
+        IConnection cnn = factory.CreateConnection();
+
+        IModel channel = cnn.CreateModel();
+
+        string exchanceName = "BidExchange";
+        string routingKey = "Bid-routing key";
+        string queueName = "BidQueue";
+
+        channel.ExchangeDeclare(exchanceName, ExchangeType.Direct);
+        channel.QueueDeclare(queueName, false, false, false, null);
+        channel.QueueBind(queueName, exchanceName, routingKey, null);
+
+        byte [] messageBodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize("Bid"));
+        channel.BasicPublish(exchanceName, routingKey, null, messageBodyBytes);
+        _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
+
+        channel.Close();
+        cnn.Close();
+
+/*
         var factory = new ConnectionFactory() { HostName = _rabbitMQ };
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
@@ -224,9 +248,10 @@ public class AuctionController : ControllerBase
             Console.WriteLine(" [x] Sent {0}", bid);
 
         Console.WriteLine(" Press [enter] to exit.");
+        Console.ReadLine();
 
         } 
-        
+        */
     }
 }
 
