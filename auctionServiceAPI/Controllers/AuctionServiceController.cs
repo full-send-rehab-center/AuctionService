@@ -197,9 +197,10 @@ public class AuctionController : ControllerBase
 
         BidCollection.InsertOne(bid);
 
+
+/*
         //create connection to RabbitMQ server
-        ConnectionFactory factory = new();
-        factory.Uri = new Uri(uriString: "amqp://guest:guest@localhost:5672");
+         var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
         factory.ClientProvidedName = "Bid Sender Method";
 
         IConnection cnn = factory.CreateConnection();
@@ -214,18 +215,20 @@ public class AuctionController : ControllerBase
         channel.QueueDeclare(queueName, false, false, false, null);
         channel.QueueBind(queueName, exchanceName, routingKey, null);
 
-        byte [] messageBodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize("Bid"));
+        byte [] messageBodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(bid));
         channel.BasicPublish(exchanceName, routingKey, null, messageBodyBytes);
         _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
 
         channel.Close();
         cnn.Close();
+*/
 
-/*
-        var factory = new ConnectionFactory() { HostName = _rabbitMQ };
+
+        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
-        _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
+        if (connection.IsOpen)
+            _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
 
         {
             //create queue if it doesn't exist
@@ -247,11 +250,8 @@ public class AuctionController : ControllerBase
             _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
             Console.WriteLine(" [x] Sent {0}", bid);
 
-        Console.WriteLine(" Press [enter] to exit.");
-        Console.ReadLine();
-
         } 
-        */
+        
     }
 }
 
