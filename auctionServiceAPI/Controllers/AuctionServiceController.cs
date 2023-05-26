@@ -34,8 +34,9 @@ public class AuctionController : ControllerBase
  
     public AuctionController(ILogger<AuctionController> logger, IConfiguration config, HttpClient httpClientUser, HttpClient httpClientProduct)
     {
-        // Creates base URI for UserService
+        // Initiates HttpClient for UserService
         _httpClientUser = httpClientUser;
+        // Initiates HttpClient for ProductService
         _httpClientProduct = httpClientProduct;
 
         //Takes enviroment variable and sets it to the logger
@@ -71,6 +72,7 @@ public class AuctionController : ControllerBase
         return user;
     }
 
+    // HttpClient that pulls a product by ID from ProductCatalog
     [HttpGet("produkt", Name = "GetProduktAsync")]
     public async Task<ProduktKatalog> GetProduktAsync(string id)
     {
