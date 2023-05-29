@@ -196,74 +196,74 @@ public class AuctionController : ControllerBase
 
 
 
-   [HttpPost("Bid", Name = "SendBid")]
-public void SendBid([FromBody] BidDTO bid)
-{
-    var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
-
-    using var connection = factory.CreateConnection();
-    using var channel = connection.CreateModel();
+    [HttpPost("Bid", Name = "SendBid")]
+    public void SendBid([FromBody] BidDTO bid)
     {
-        if (!connection.IsOpen)
+        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
+
+        using var connection = factory.CreateConnection();
+        using var channel = connection.CreateModel();
         {
-            _logger.LogError($"Failed to establish connection to RabbitMQ server at {DateTime.Now}");
-            return;
-        }
-        else
-        {
-            _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
-
-            channel.ExchangeDeclare(exchange: "bidExchange", type: ExchangeType.Topic);
-            channel.QueueDeclare(queue: "bidQueue",
-                                 durable: false,
-                                 exclusive: false,
-                                 autoDelete: false,
-                                 arguments: null);
-
-            var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(bid));
-            _logger.LogInformation($"Bid serialized at {DateTime.Now}");
-
-            var properties = channel.CreateBasicProperties();
-            properties.Persistent = true; //Makes sure the message is not lost if the RabbitMQ server crashes
-
-            // Enable publisher confirms
-            channel.ConfirmSelect();
-
-            // Event handler for successful message delivery
-            channel.BasicAcks += (sender, eventArgs) =>
+            if (!connection.IsOpen)
             {
-                if (eventArgs.Multiple)
-                {
-                    _logger.LogInformation("Multiple messages were successfully delivered to RabbitMQ queue");
-                }
-                else
-                {
-                    _logger.LogInformation("Message was successfully delivered to RabbitMQ queue");
-                }
-            };
-
-            // Event handler for failed message delivery
-            channel.BasicNacks += (sender, eventArgs) =>
-            {
-                _logger.LogWarning("Failed to deliver message to RabbitMQ queue");
-            };
-
-            channel.BasicPublish(exchange: "bidExchange",
-                                 routingKey: "bidQueue",
-                                 basicProperties: properties,
-                                 body: body);
-
-            // Wait until all confirms are received (or timeout after 5 seconds)
-            if (!channel.WaitForConfirms(TimeSpan.FromSeconds(5)))
-            {
-                _logger.LogWarning("Timeout occurred while waiting for confirms");
+                _logger.LogError($"Failed to establish connection to RabbitMQ server at {DateTime.Now}");
+                return;
             }
+            else
+            {
+                _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
 
-            _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
-            Console.WriteLine(" [x] Sent {0}", bid);
+                channel.ExchangeDeclare(exchange: "bidExchange", type: ExchangeType.Topic);
+                channel.QueueDeclare(queue: "bidQueue",
+                                     durable: false,
+                                     exclusive: false,
+                                     autoDelete: false,
+                                     arguments: null);
+
+                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(bid));
+                _logger.LogInformation($"Bid serialized at {DateTime.Now}");
+
+                var properties = channel.CreateBasicProperties();
+                properties.Persistent = true; //Makes sure the message is not lost if the RabbitMQ server crashes
+
+                // Enable publisher confirms
+                channel.ConfirmSelect();
+
+                // Event handler for successful message delivery
+                channel.BasicAcks += (sender, eventArgs) =>
+                {
+                    if (eventArgs.Multiple)
+                    {
+                        _logger.LogInformation("Multiple messages were successfully delivered to RabbitMQ queue");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Message was successfully delivered to RabbitMQ queue");
+                    }
+                };
+
+                // Event handler for failed message delivery
+                channel.BasicNacks += (sender, eventArgs) =>
+                {
+                    _logger.LogWarning("Failed to deliver message to RabbitMQ queue");
+                };
+
+                channel.BasicPublish(exchange: "bidExchange",
+                                     routingKey: "bidQueue",
+                                     basicProperties: properties,
+                                     body: body);
+
+                // Wait until all confirms are received (or timeout after 5 seconds)
+                if (!channel.WaitForConfirms(TimeSpan.FromSeconds(5)))
+                {
+                    _logger.LogWarning("Timeout occurred while waiting for confirms");
+                }
+
+                _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
+                Console.WriteLine(" [x] Sent {0}", bid);
+            }
         }
     }
-}
 
 
 }
