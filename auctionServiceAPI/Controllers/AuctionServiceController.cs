@@ -98,23 +98,23 @@ public class AuctionController : ControllerBase
         //Adds the auction to the user
         AuctionCollection.InsertOne(auction);
     }
-/*
-    [HttpPut("auction/{id}", Name = "UpdateAuction")]
-    public void UpdateAuction(string id, [FromBody] Auction auction)
-    {
-        var auctionToUpdate = Collection.Find(x => x.Id == id).FirstOrDefault();
+    /*
+        [HttpPut("auction/{id}", Name = "UpdateAuction")]
+        public void UpdateAuction(string id, [FromBody] Auction auction)
+        {
+            var auctionToUpdate = Collection.Find(x => x.Id == id).FirstOrDefault();
 
-        auctionToUpdate.AuctionItem = auction.AuctionItem;
-        auctionToUpdate.StartingPrice = auction.StartingPrice;
-        auctionToUpdate.CurrentBid = auction.CurrentBid;
-        auctionToUpdate.StartTime = auction.StartTime;
-        auctionToUpdate.EndTime = auction.EndTime;
+            auctionToUpdate.AuctionItem = auction.AuctionItem;
+            auctionToUpdate.StartingPrice = auction.StartingPrice;
+            auctionToUpdate.CurrentBid = auction.CurrentBid;
+            auctionToUpdate.StartTime = auction.StartTime;
+            auctionToUpdate.EndTime = auction.EndTime;
 
-        Collection.ReplaceOne(x => x.Id == id, auctionToUpdate);
-    }
-*/
-//___________________________________________________________________________________________________________________________________________________________//
-// User methods
+            Collection.ReplaceOne(x => x.Id == id, auctionToUpdate);
+        }
+    */
+    //___________________________________________________________________________________________________________________________________________________________//
+    // User methods
 
     [HttpGet("users", Name = "GetUsers")]
     public List<UserDTO> GetUsers()
@@ -194,47 +194,79 @@ public class AuctionController : ControllerBase
         return auction.Id;
     }
 
-    [HttpPost("Bid", Name = "SendBid")]
-    public void SendBid([FromBody] BidDTO bid)
+
+
+   [HttpPost("Bid", Name = "SendBid")]
+public void SendBid([FromBody] BidDTO bid)
+{
+    var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
+
+    using var connection = factory.CreateConnection();
+    using var channel = connection.CreateModel();
     {
-
-        BidCollection.InsertOne(bid);
-
-        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
-        using var connection = factory.CreateConnection();
-        using var channel = connection.CreateModel();
-        if (connection.IsOpen)
+        if (!connection.IsOpen)
+        {
+            _logger.LogError($"Failed to establish connection to RabbitMQ server at {DateTime.Now}");
+            return;
+        }
+        else
+        {
             _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
 
-        {
             channel.ExchangeDeclare(exchange: "bidExchange", type: ExchangeType.Topic);
-
-            //create queue if it doesn't exist
             channel.QueueDeclare(queue: "bidQueue",
                                  durable: false,
                                  exclusive: false,
                                  autoDelete: false,
                                  arguments: null);
 
-            //convert bid to JSON
             var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(bid));
             _logger.LogInformation($"Bid serialized at {DateTime.Now}");
 
-            //convert byte[] to ReadOnlyMemory<byte>
-            var bodyMemory = new Memory<byte>(body);
+            var properties = channel.CreateBasicProperties();
+            properties.Persistent = true; //Makes sure the message is not lost if the RabbitMQ server crashes
 
-            //publishes the JSON-string to the channel
+            // Enable publisher confirms
+            channel.ConfirmSelect();
+
+            // Event handler for successful message delivery
+            channel.BasicAcks += (sender, eventArgs) =>
+            {
+                if (eventArgs.Multiple)
+                {
+                    _logger.LogInformation("Multiple messages were successfully delivered to RabbitMQ queue");
+                }
+                else
+                {
+                    _logger.LogInformation("Message was successfully delivered to RabbitMQ queue");
+                }
+            };
+
+            // Event handler for failed message delivery
+            channel.BasicNacks += (sender, eventArgs) =>
+            {
+                _logger.LogWarning("Failed to deliver message to RabbitMQ queue");
+            };
+
             channel.BasicPublish(exchange: "bidExchange",
                                  routingKey: "bidQueue",
-                                 basicProperties: null,
+                                 basicProperties: properties,
                                  body: body);
+
+            // Wait until all confirms are received (or timeout after 5 seconds)
+            if (!channel.WaitForConfirms(TimeSpan.FromSeconds(5)))
+            {
+                _logger.LogWarning("Timeout occurred while waiting for confirms");
+            }
+
             _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
             Console.WriteLine(" [x] Sent {0}", bid);
-
-        } 
-        
+        }
     }
 }
-                
-        
+
+
+}
+
+
 
