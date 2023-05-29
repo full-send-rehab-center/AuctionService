@@ -9,7 +9,9 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using MongoDB.Driver.Core.Configuration;
 using Microsoft.Extensions.Caching.Memory;
-
+using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
+using System.Runtime.InteropServices;
 
 namespace auctionServiceAPI.Controllers;
 
@@ -23,6 +25,7 @@ public class AuctionController : ControllerBase
     private readonly ILogger<AuctionController> _logger;
     private readonly string? _docPath;
     private readonly string? _rabbitMQ;
+    public IConnectionFactory ConnectionFactory { get; set; }
     public IMongoDatabase Database { get; set; }
     public IMongoCollection<Auction> AuctionCollection { get; set; }
     public IMongoCollection<UserDTO> UsersCollection { get; set; }
@@ -197,33 +200,6 @@ public class AuctionController : ControllerBase
 
         BidCollection.InsertOne(bid);
 
-
-/*
-        //create connection to RabbitMQ server
-         var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
-        factory.ClientProvidedName = "Bid Sender Method";
-
-        IConnection cnn = factory.CreateConnection();
-
-        IModel channel = cnn.CreateModel();
-
-        string exchanceName = "BidExchange";
-        string routingKey = "Bid-routing key";
-        string queueName = "BidQueue";
-
-        channel.ExchangeDeclare(exchanceName, ExchangeType.Direct);
-        channel.QueueDeclare(queueName, false, false, false, null);
-        channel.QueueBind(queueName, exchanceName, routingKey, null);
-
-        byte [] messageBodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(bid));
-        channel.BasicPublish(exchanceName, routingKey, null, messageBodyBytes);
-        _logger.LogInformation($"Bid sent to RabbitMQ queue at {DateTime.Now}");
-
-        channel.Close();
-        cnn.Close();
-*/
-
-
         var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
@@ -231,6 +207,8 @@ public class AuctionController : ControllerBase
             _logger.LogInformation($"Connection to RabbitMQ server established at {DateTime.Now}");
 
         {
+            channel.ExchangeDeclare(exchange: "bidExchange", type: ExchangeType.Topic);
+
             //create queue if it doesn't exist
             channel.QueueDeclare(queue: "bidQueue",
                                  durable: false,
@@ -239,11 +217,14 @@ public class AuctionController : ControllerBase
                                  arguments: null);
 
             //convert bid to JSON
-            var body = JsonSerializer.SerializeToUtf8Bytes(bid);
+            var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(bid));
             _logger.LogInformation($"Bid serialized at {DateTime.Now}");
 
+            //convert byte[] to ReadOnlyMemory<byte>
+            var bodyMemory = new Memory<byte>(body);
+
             //publishes the JSON-string to the channel
-            channel.BasicPublish(exchange: "",
+            channel.BasicPublish(exchange: "bidExchange",
                                  routingKey: "bidQueue",
                                  basicProperties: null,
                                  body: body);
@@ -254,48 +235,6 @@ public class AuctionController : ControllerBase
         
     }
 }
-
-/*
-
-
-   
-
-            // save bid to cache
-            var cacheKey = $"bid_{auctionId}";
-            var cacheBid = GetBidFromCache(cacheKey);
-
-            // check if bid amount is greater than previous bid amount
-            if (cacheBid == null || bidAmount > cacheBid.BidAmount)
-            {
-                // create new bid or update existing bid
-                SetBidToCache(cacheKey, bid);
-
-                // send new bid to RabbitMQ queue
-                channel.BasicPublish(exchange: "", routingKey: "bidQueue", basicProperties: null, body: body);
-                _logger.LogInformation($"New bid sent to RabbitMQ queue at {DateTime.Now}");
-            }
-            else
-            {
-                // The bid amount is not greater than the previous bid, so no action is taken.
-                _logger.LogInformation($"Bid amount is not greater than the previous bid amount. No action taken.");
-            }
-
-            Console.WriteLine(" Press [enter] to exit.");
-
-                    //get previous bid from cache
-
-                    //check if bid amount is greater than previous bid amount
-
-                    //create new bid
-
-
-                    //save bid to cache
-
-                    //send new bid to RabbitMQ queue
-
-                }
-                */
-
                 
         
 
