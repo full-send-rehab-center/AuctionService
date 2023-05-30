@@ -249,7 +249,7 @@ public class AuctionController : ControllerBase
                 };
 
                 channel.BasicPublish(exchange: "bidExchange",
-                                     routingKey: "bidQueue",
+                                     routingKey: "bid",
                                      basicProperties: properties,
                                      body: body);
 
