@@ -12,6 +12,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
+using System.Net.Http;
+
 
 namespace auctionServiceAPI.Controllers;
 
@@ -19,7 +21,6 @@ namespace auctionServiceAPI.Controllers;
 [Route("[controller]")]
 public class AuctionController : ControllerBase
 {
-
     private readonly IConfiguration _config;
     private readonly IMongoDatabase _database;
     private readonly ILogger<AuctionController> _logger;
@@ -33,10 +34,16 @@ public class AuctionController : ControllerBase
     private List<Auction> _auctions = new List<Auction>();
     private List<UserDTO> _users = new List<UserDTO>();
 
-
-
-    public AuctionController(ILogger<AuctionController> logger, IConfiguration config)
+    private readonly HttpClient _httpClientUser;
+    private readonly HttpClient _httpClientProduct;
+ 
+    public AuctionController(ILogger<AuctionController> logger, IConfiguration config, HttpClient httpClientUser, HttpClient httpClientProduct)
     {
+        // Initiates HttpClient for UserService
+        _httpClientUser = httpClientUser;
+        // Initiates HttpClient for ProductService
+        _httpClientProduct = httpClientProduct;
+
         //Takes enviroment variable and sets it to the logger
         _logger = logger;
         _docPath = config["DocPath"];
@@ -61,6 +68,27 @@ public class AuctionController : ControllerBase
         BidCollection = _database.GetCollection<BidDTO>(_config["MongoDB:BidCollection"]);
     }
 
+    // HttpClient that pulls a user by ID from UserService
+    [HttpGet("user", Name = "GetUsersAsync")]
+    public async Task<UserDTO> GetUsersAsync(string id)
+    {
+        _httpClientUser.BaseAddress = new Uri("http://localhost:5018/");
+        var user = await _httpClientUser.GetFromJsonAsync<UserDTO>(
+                    $"api/brugerservice/{id}");
+        return user;
+    }
+
+    // HttpClient that pulls a product by ID from ProductCatalog
+    [HttpGet("produkt", Name = "GetProduktAsync")]
+    public async Task<ProduktKatalog> GetProduktAsync(string id)
+    {
+        _httpClientProduct.BaseAddress = new Uri("http://localhost:5011/");
+        var produkt = await _httpClientProduct.GetFromJsonAsync<ProduktKatalog>(
+                    $"api/produktkatalog/category/{id}");
+        return produkt;
+    }
+
+
     private IMongoCollection<UserDTO> GetUsersCollection(IConfiguration config)
     {
         var ConnectionString = config["MongoDB:ConnectionString"];
@@ -84,10 +112,10 @@ public class AuctionController : ControllerBase
         return auctionCollection.ToList();
     }
 
-    [HttpPost("auction", Name = "CreateAuction")]
+     [HttpPost("auction", Name = "CreateAuction")]
     public void CreateAuction([FromBody] Auction auction, [FromQuery] string id)
     {
-        UserDTO user = UsersCollection.Find(x => x.Id == id).FirstOrDefault();
+        UserDTO user = UsersCollection.Find(x => x.UserId == id).FirstOrDefault();
         auction.StartTime = DateTime.Now;
         auction.EndTime = DateTime.Now.AddDays(2);
         _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
@@ -99,7 +127,7 @@ public class AuctionController : ControllerBase
         AuctionCollection.InsertOne(auction);
     }
     /*
-        [HttpPut("auction/{id}", Name = "UpdateAuction")]
+        [HttpPut("auction/{id}", Name = "UpdateAuction")]a
         public void UpdateAuction(string id, [FromBody] Auction auction)
         {
             var auctionToUpdate = Collection.Find(x => x.Id == id).FirstOrDefault();
@@ -116,56 +144,56 @@ public class AuctionController : ControllerBase
     //___________________________________________________________________________________________________________________________________________________________//
     // User methods
 
-    [HttpGet("users", Name = "GetUsers")]
-    public List<UserDTO> GetUsers()
-    {
-        var usersCollection = GetUsersCollection(_config);
-        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+    // [HttpGet("users", Name = "GetUsers")]
+    // public List<UserDTO> GetUsers()
+    // {
+    //     var usersCollection = GetUsersCollection(_config);
+    //     var userDocument = usersCollection.Find(new BsonDocument()).ToList();
 
-        _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
+    //     _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
 
-        return userDocument.ToList();
-    }
+    //     return userDocument.ToList();
+    // }
 
-    [HttpGet("user/{id}", Name = "GetUserById")]
-    public UserDTO GetUserById(string id)
-    {
-        var usersCollection = GetUsersCollection(_config);
-        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+    // [HttpGet("user/{id}", Name = "GetUserById")]
+    // public UserDTO GetUserById(string id)
+    // {
+    //     var usersCollection = GetUsersCollection(_config);
+    //     var userDocument = usersCollection.Find(new BsonDocument()).ToList();
 
-        _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
+    //     _logger.LogInformation("GetUsers method called at {datetime}", DateTime.Now);
 
-        return userDocument.ToList().Find(x => x.Id == id);
-    }
+    //     return userDocument.ToList().Find(x => x.UserId == id);
+    // }
 
-    [HttpPut("user/{id}", Name = "UpdateUser")]
-    public void UpdateUser(string id, [FromBody] UserDTO user)
-    {
-        var usersCollection = GetUsersCollection(_config);
-        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+    // [HttpPut("user/{id}", Name = "UpdateUser")]
+    // public void UpdateUser(string id, [FromBody] UserDTO user)
+    // {
+    //     var usersCollection = GetUsersCollection(_config);
+    //     var userDocument = usersCollection.Find(new BsonDocument()).ToList();
 
-        var userToUpdate = userDocument.ToList().Find(x => x.Id == id);
+    //     var userToUpdate = userDocument.ToList().Find(x => x.UserId == id);
 
-        userToUpdate.Username = user.Username;
-        userToUpdate.Password = user.Password;
-        userToUpdate.Role = user.Role;
-        userToUpdate.Address = user.Address;
-        userToUpdate.Email = user.Email;
-        userToUpdate.Telephone = user.Telephone;
+    //     userToUpdate.Username = user.Username;
+    //     userToUpdate.Password = user.Password;
+    //     userToUpdate.Role = user.Role;
+    //     userToUpdate.Address = user.Address;
+    //     userToUpdate.Email = user.Email;
+    //     userToUpdate.Telephone = user.Telephone;
 
-        usersCollection.ReplaceOne(x => x.Id == id, userToUpdate);
-    }
+    //     usersCollection.ReplaceOne(x => x.UserId == id, userToUpdate);
+    // }
 
-    [HttpDelete("user/{id}", Name = "DeleteUser")]
-    public void DeleteUser(string id)
-    {
-        var usersCollection = GetUsersCollection(_config);
-        var userDocument = usersCollection.Find(new BsonDocument()).ToList();
+    // [HttpDelete("user/{id}", Name = "DeleteUser")]
+    // public void DeleteUser(string id)
+    // {
+    //     var usersCollection = GetUsersCollection(_config);
+    //     var userDocument = usersCollection.Find(new BsonDocument()).ToList();
 
-        var userToDelete = userDocument.ToList().Find(x => x.Id == id);
+    //     var userToDelete = userDocument.ToList().Find(x => x.UserId == id);
 
-        usersCollection.DeleteOne(x => x.Id == id);
-    }
+    //     usersCollection.DeleteOne(x => x.UserId == id);
+    // }
 
 
 
@@ -173,9 +201,9 @@ public class AuctionController : ControllerBase
     public void CreateUser([FromBody] UserDTO user)
     {
         var usersCollection = GetUsersCollection(_config);
-        user.Id = ObjectId.GenerateNewId().ToString();
+        user.UserId = ObjectId.GenerateNewId().ToString();
         usersCollection.InsertOne(user);
-        _logger.LogInformation($"**********User{user.Id} has been created:**********");
+        _logger.LogInformation($"**********User{user.UserId} has been created:**********");
     }
 
 
@@ -183,8 +211,8 @@ public class AuctionController : ControllerBase
     //Gets the user id from the user collection
     private string GetUserId(string bidderId)
     {
-        var user = UsersCollection.Find(x => x.Id == bidderId).FirstOrDefault();
-        return user.Id;
+        var user = UsersCollection.Find(x => x.UserId == bidderId).FirstOrDefault();
+        return user.UserId;
     }
 
     //Gets the auction id from the auction collection
