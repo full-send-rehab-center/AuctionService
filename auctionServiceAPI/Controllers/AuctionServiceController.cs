@@ -113,18 +113,22 @@ public class AuctionController : ControllerBase
     }
 
      [HttpPost("auction", Name = "CreateAuction")]
-    public void CreateAuction([FromBody] Auction auction, [FromQuery] string id)
+    public async Task<IActionResult> CreateAuction([FromBody] Auction auction, [FromQuery] string userid, [FromQuery] string produktid)
     {
-        UserDTO user = UsersCollection.Find(x => x.UserId == id).FirstOrDefault();
+        // UserDTO user = UsersCollection.Find(x => x.UserId == id).FirstOrDefault();
+        UserDTO user = await GetUsersAsync(userid);
+        ProduktKatalog produkt = await GetProduktAsync(produktid);
         auction.StartTime = DateTime.Now;
         auction.EndTime = DateTime.Now.AddDays(2);
         _logger.LogInformation($"**********Product{auction.Id} has been created:**********");
 
         //Adds the user to the auction
         auction.User = user;
+        auction.AuctionItem = produkt;
 
         //Adds the auction to the user
         AuctionCollection.InsertOne(auction);
+        return Ok();
     }
     /*
         [HttpPut("auction/{id}", Name = "UpdateAuction")]a

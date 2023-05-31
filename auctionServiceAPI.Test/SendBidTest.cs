@@ -6,6 +6,7 @@ using auctionServiceAPI.Controllers;
 using auctionServiceAPI.DTO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 
 
 
