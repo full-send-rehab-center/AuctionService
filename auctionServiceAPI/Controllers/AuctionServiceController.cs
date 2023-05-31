@@ -212,9 +212,9 @@ public class AuctionController : ControllerBase
     public void CreateUser([FromBody] UserDTO user)
     {
         var usersCollection = GetUsersCollection(_config);
-        user.UserId = ObjectId.GenerateNewId().ToString();
+        user.userID = ObjectId.GenerateNewId().ToString();
         usersCollection.InsertOne(user);
-        _logger.LogInformation($"**********User{user.UserId} has been created:**********");
+        _logger.LogInformation($"**********User{user.userID} has been created:**********");
     }
 
 
@@ -222,8 +222,8 @@ public class AuctionController : ControllerBase
     //Gets the user id from the user collection
     private string GetUserId(string bidderId)
     {
-        var user = UsersCollection.Find(x => x.UserId == bidderId).FirstOrDefault();
-        return user.UserId;
+        var user = UsersCollection.Find(x => x.userID == bidderId).FirstOrDefault();
+        return user.userID;
     }
 
     //Gets the auction id from the auction collection
