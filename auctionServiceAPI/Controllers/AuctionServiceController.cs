@@ -68,9 +68,9 @@ public class AuctionController : ControllerBase
         
 
         //Connects to the database
-        var client = new MongoClient(_config["MongoDB:ConnectionString"]);
-        _database = client.GetDatabase(_config["MongoDB:Database"]);
-        AuctionCollection = _database.GetCollection<Auction>(_config["MongoDB:AuctionCollection"]);
+        var client = new MongoClient(_config["ConnectionString"]);
+        _database = client.GetDatabase(_config["DatabaseName"]);
+        AuctionCollection = _database.GetCollection<Auction>(_config["CollectionName"]);
         UsersCollection = _database.GetCollection<UserDTO>(_config["MongoDB:UsersCollection"]);
         BidCollection = _database.GetCollection<BidDTO>(_config["MongoDB:BidCollection"]);
     }
