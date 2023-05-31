@@ -8,9 +8,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http;
 
-
-
-
 namespace auctionServiceAPI.Test;
 
 public class SendBidTest
@@ -39,6 +36,8 @@ public void SendBid_ShouldSendBidToQueue()
     // Opretter mock-objekter til afhængighederne
     var mockConfig = new Mock<IConfiguration>();
     var mockLogger = new Mock<ILogger<AuctionController>>();
+    var mockHttpUser = new Mock<HttpClient>();
+    var mockHttpProduct = new Mock<HttpClient>();
 
     // Opsætter forventninger på mockConfig
     mockConfig.Setup(x => x.GetSection("RabbitMQ:HostName").Value).Returns("localhost");
@@ -49,7 +48,7 @@ public void SendBid_ShouldSendBidToQueue()
     mockConfig.Setup(x => x["MongoDB:UsersCollection"]).Returns("UsersCollection");
 
     // Opretter AuctionController-objektet med mock-afhængigheder
-    var auctionController = new AuctionController(mockLogger.Object, mockConfig.Object);
+    var auctionController = new AuctionController(mockLogger.Object, mockConfig.Object, mockHttpUser.Object, mockHttpProduct.Object);
 
     // Opretter et BidDTO-objekt med testdata
     var bid = new BidDTO
