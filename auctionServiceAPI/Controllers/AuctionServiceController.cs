@@ -82,6 +82,7 @@ public class AuctionController : ControllerBase
         _httpClientUser.BaseAddress = new Uri(_baseURIUser);
         var user = await _httpClientUser.GetFromJsonAsync<UserDTO>(
                     $"api/brugerservice/{id}");
+        _logger.LogInformation($"Recieved user with values: {user.userId}");
         return user;
     }
 
