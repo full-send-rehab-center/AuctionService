@@ -199,7 +199,9 @@ public class AuctionController : ControllerBase
     [HttpPost("Bid", Name = "SendBid")]
     public void SendBid([FromBody] BidDTO bid)
     {
-        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri("amqp://guest:guest@localhost:5672/") };
+        //var factory = new RabbitMQ.Client.ConnectionFactory() { HostName = "localhost" };
+        var rabbitMQConnectionString = _config["RabbitMQ:ConnectionString"];
+        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri(rabbitMQConnectionString) };
 
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
