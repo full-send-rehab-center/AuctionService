@@ -36,13 +36,18 @@ public class AuctionController : ControllerBase
 
     private readonly HttpClient _httpClientUser;
     private readonly HttpClient _httpClientProduct;
+    private readonly string? _baseURIUser;
+    private readonly string? _baseURIProduct;
  
     public AuctionController(ILogger<AuctionController> logger, IConfiguration config, HttpClient httpClientUser, HttpClient httpClientProduct)
     {
         // Initiates HttpClient for UserService
+        _baseURIUser = config["BaseURIUser"];
         _httpClientUser = httpClientUser;
         // Initiates HttpClient for ProductService
+        _baseURIProduct = config["BaseURIProduct"];
         _httpClientProduct = httpClientProduct;
+
 
         //Takes enviroment variable and sets it to the logger
         _logger = logger;
@@ -59,6 +64,8 @@ public class AuctionController : ControllerBase
         _logger.LogInformation($"File path is set to : {_docPath}");
         _logger.LogInformation($"RabbitMQ connection is set to : {_rabbitMQ}");
 
+        //Sætter baseuri for produktservice og userservice
+        
 
         //Connects to the database
         var client = new MongoClient(_config["MongoDB:ConnectionString"]);
@@ -72,7 +79,7 @@ public class AuctionController : ControllerBase
     [HttpGet("user", Name = "GetUsersAsync")]
     public async Task<UserDTO> GetUsersAsync(string id)
     {
-        _httpClientUser.BaseAddress = new Uri("http://localhost:5018/");
+        _httpClientUser.BaseAddress = new Uri(_baseURIUser);
         var user = await _httpClientUser.GetFromJsonAsync<UserDTO>(
                     $"api/brugerservice/{id}");
         return user;
@@ -82,7 +89,7 @@ public class AuctionController : ControllerBase
     [HttpGet("produkt", Name = "GetProduktAsync")]
     public async Task<ProduktKatalog> GetProduktAsync(string id)
     {
-        _httpClientProduct.BaseAddress = new Uri("http://localhost:5011/");
+        _httpClientProduct.BaseAddress = new Uri(_baseURIProduct);
         var produkt = await _httpClientProduct.GetFromJsonAsync<ProduktKatalog>(
                     $"api/produktkatalog/category/{id}");
         return produkt;
