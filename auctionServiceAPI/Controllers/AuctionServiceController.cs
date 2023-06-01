@@ -51,9 +51,10 @@ public class AuctionController : ControllerBase
 
         //Takes enviroment variable and sets it to the logger
         _logger = logger;
+        _config = config;
         _docPath = config["DocPath"];
         _rabbitMQ = config["RabbitMQ"];
-        _config = config;
+        
 
         //Retrieves host name and IP address from the current enviroment
         var hostName = System.Net.Dns.GetHostName();
@@ -241,8 +242,8 @@ public class AuctionController : ControllerBase
     {
         //var factory = new RabbitMQ.Client.ConnectionFactory() { HostName = "localhost" };
         // var rabbitMQConnectionString = _config["RabbitMQ:ConnectionString"];
-        var rabbitMQConnectionString = _config["RabbitMQ"];
-        var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri(rabbitMQConnectionString) };
+        // var factory = new RabbitMQ.Client.ConnectionFactory() { Uri = new Uri(rabbitMQConnectionString) };
+        var factory = new ConnectionFactory { HostName = _rabbitMQ };
 
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
