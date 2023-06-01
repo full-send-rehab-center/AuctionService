@@ -65,9 +65,6 @@ public class AuctionController : ControllerBase
         _logger.LogInformation($"File path is set to : {_docPath}");
         _logger.LogInformation($"RabbitMQ connection is set to : {_rabbitMQ}");
 
-        //Sætter baseuri for produktservice og userservice
-        
-
         //Connects to the database
         var client = new MongoClient(_config["ConnectionString"]);
         _database = client.GetDatabase(_config["DatabaseName"]);
